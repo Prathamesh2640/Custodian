@@ -1,27 +1,31 @@
-"""Draws src/icon.ico (drive + sparkle). Run once after changing the design:
+"""Draws src/icon.ico: a key whose bow is a disk platter, on a safety-yellow tile.
     .venv\\Scripts\\python src\\make_icon.py
-Each size is rendered separately so 16/24/32 px stay crisp.
+Each size is rendered separately so 16/24/32 px stay crisp (small sizes drop the fine detail).
 """
 import os
 import struct
 import sys
 
 from PySide6.QtCore import QBuffer, QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QGuiApplication, QImage, QLinearGradient, QPainter, QPainterPath
+from PySide6.QtGui import QColor, QGuiApplication, QImage, QPainter, QPainterPath, QPen
 
-SIZES = (16, 24, 32, 48, 64, 128, 256)
+SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+YELLOW, SLATE = QColor("#FFC83D"), QColor("#122327")
 
 
-def sparkle(cx, cy, r):
-    k = r * 0.22   # waist of the four-point star
-    pts = [(cx, cy - r), (cx + k, cy - k), (cx + r, cy), (cx + k, cy + k),
-           (cx, cy + r), (cx - k, cy + k), (cx - r, cy), (cx - k, cy - k)]
-    path = QPainterPath(QPointF(*pts[0]))
-    for p in pts[1:]:
-        path.lineTo(*p)
-    path.closeSubpath()
-    return path
+def key_path(detail):
+    """Key pointing right; bow (platter) on the left. Coordinates in a 256 box."""
+    p = QPainterPath()
+    p.setFillRule(Qt.WindingFill)             # overlapping parts must merge, not cancel
+    p.addEllipse(QPointF(92, 128), 60, 60)                     # platter / bow
+    p.addRoundedRect(QRectF(138, 115, 88, 26), 6, 6)           # shaft
+    if detail:
+        p.addRect(QRectF(176, 128, 16, 38))                    # teeth
+        p.addRect(QRectF(202, 128, 16, 26))
+    else:
+        p.addRect(QRectF(180, 128, 30, 34))
+    return p.simplified()
 
 
 def render(size):
@@ -30,33 +34,27 @@ def render(size):
     p = QPainter(img)
     p.setRenderHint(QPainter.Antialiasing)
     p.scale(size / 256, size / 256)
-    small = size <= 24
+    detail = size >= 40
 
-    # background tile
-    bg = QLinearGradient(0, 0, 256, 256)
-    bg.setColorAt(0, QColor("#2563eb"))
-    bg.setColorAt(1, QColor("#0f766e"))
     p.setPen(Qt.NoPen)
-    p.setBrush(bg)
-    p.drawRoundedRect(QRectF(8, 8, 240, 240), 52, 52)
+    p.setBrush(YELLOW)
+    p.drawRoundedRect(QRectF(6, 6, 244, 244), 58, 58)
 
-    # drive body
-    p.setBrush(QColor("#f8fafc"))
-    body = QRectF(40, 118, 176, 86) if not small else QRectF(30, 110, 196, 104)
-    p.drawRoundedRect(body, 22, 22)
-    p.setBrush(QColor("#cbd5e1"))
-    p.drawRect(QRectF(body.left() + 16, body.top() + body.height() * 0.52, body.width() - 32, 10 if not small else 0))
-    p.setBrush(QColor("#22c55e"))
-    p.drawEllipse(QPointF(body.right() - 34, body.top() + body.height() / 2 - (8 if not small else 0)),
-                  13 if not small else 20, 13 if not small else 20)
+    p.translate(128, 128)                                      # slight tilt reads as "in use"
+    p.rotate(-32)
+    p.translate(-128, -128)
+    p.setBrush(SLATE)
+    p.drawPath(key_path(detail))
 
-    # sparkles
-    p.setBrush(QColor("#fde047"))
-    p.drawPath(sparkle(150, 70, 52 if not small else 62))
-    if not small:
-        p.setBrush(QColor("#ffffff"))
-        p.drawPath(sparkle(78, 62, 24))
-        p.drawPath(sparkle(206, 44, 16))
+    # platter details in yellow: data track and hub
+    p.setBrush(Qt.NoBrush)
+    if detail:
+        p.setPen(QPen(YELLOW, 7))
+        p.drawEllipse(QPointF(92, 128), 38, 38)
+    p.setPen(Qt.NoPen)
+    p.setBrush(YELLOW)
+    r = 13 if detail else 18
+    p.drawEllipse(QPointF(92, 128), r, r)
     p.end()
     return img
 

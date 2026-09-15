@@ -11,7 +11,7 @@ from PySide6.QtCore import QDir, QLockFile, QObject, QSettings, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QGuiApplication, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QFrame,
                                QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMenu,
-                               QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox,
+                               QMessageBox, QPlainTextEdit, QPushButton, QScrollArea, QSpinBox,
                                QStackedWidget, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 import engine
@@ -19,10 +19,11 @@ import knowledge
 import monitor
 import rules
 import theme
-from widgets import ConfirmDialog, DriveCard, MetricCard, PulseDot, button, card, label, pill
+from widgets import (ConfirmDialog, DriveCard, HazardBar, MetricCard, PulseDot, button, card, label, number,
+                     pill)
 
 APP = "Custodian"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 ICON = os.path.join(BASE, "icon.ico")
 DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), APP)
@@ -60,7 +61,7 @@ class Bus(QObject):
     recs = Signal(object)
 
 
-def icon_label(glyph, color=theme.CYAN, size=16):
+def icon_label(glyph, color=theme.ACCENT, size=16):
     lbl = QLabel(glyph)
     lbl.setFont(theme.icon_font(size))
     lbl.setStyleSheet(f"color:{color}; background: transparent")
@@ -152,7 +153,7 @@ class ActionBar(QFrame):
 
     def set_selection(self, items, enabled):
         size = sum(i.size for i in items)
-        self.selected.setText(f"{len(items):,} selected  ·  {engine.fmt_size(size)}" if items else "Nothing selected")
+        self.selected.setText(f"{len(items):,} selected, {engine.fmt_size(size)}" if items else "Nothing selected")
         self.go.setEnabled(bool(items) and enabled)
 
 
@@ -243,9 +244,9 @@ class ResultsPage(Page):
         review = [i for i in items if i.rule["risk"] != rules.SAFE and i.rule["action"] != "userfile"]
         c = theme
         lines = [f"<b>{len(items):,}</b> item(s) on <b>{self.result.root[:2]}</b> totalling "
-                 f"<b style='color:{c.CYAN}'>{engine.fmt_size(size)}</b>.", ""]
+                 f"<b style='color:{c.ACCENT}'>{engine.fmt_size(size)}</b>.", ""]
         if recycle:
-            lines.append(f"<span style='color:{c.GREEN}'><b>Recycle Bin mode</b></span>: everything stays recoverable. "
+            lines.append(f"<span style='color:{c.MINT}'><b>Recycle Bin mode</b></span>: everything stays recoverable. "
                          "Free space only goes up after you empty the bin.")
         else:
             lines.append(f"<span style='color:{c.RED}'><b>Permanent mode</b></span>: removed immediately and "
@@ -278,20 +279,20 @@ class ResultsPage(Page):
 
     def cleaned(self, out):
         gained = max(out["gained"], 0)
-        msg = f"Freed {engine.fmt_size(gained)} · {out['files']:,} files"
+        msg = f"Freed {engine.fmt_size(gained)} from {out['files']:,} files"
         if out["moved"]:
-            msg += f" · {engine.fmt_size(out['moved'])} moved to the Recycle Bin"
+            msg += f", {engine.fmt_size(out['moved'])} moved to the Recycle Bin"
         extra = [f"{out['errors']:,} locked" if out["errors"] else "",
                  f"{out['skipped']} skipped" if out["skipped"] else "",
                  f"{out['refused']} refused by guard rails" if out["refused"] else ""]
         extra = [x for x in extra if x]
         if extra:
-            msg += " · " + ", ".join(extra)
+            msg += " (" + ", ".join(extra) + ")"
         self.win.log("RESULT " + msg)
         self.win.session_freed += gained
         self.clear(msg + ". Scan again to see what is left.")
         self.win.refresh_drives()
-        self.win.flash(msg, theme.GREEN if not out["errors"] and not out["refused"] else theme.AMBER)
+        self.win.flash(msg, theme.MINT if not out["errors"] and not out["refused"] else theme.AMBER)
 
 
 class CleanupPage(ResultsPage):
@@ -373,14 +374,14 @@ class CleanupPage(ResultsPage):
         total = sum(i.size for i in res.items)
         safe = sum(i.size for i in res.items if i.rule["risk"] == rules.SAFE and not i.blocked)
         blocked = sum(1 for i in res.items if i.blocked)
-        text = (f"Found {engine.fmt_size(total)} in {len(res.items)} items, {engine.fmt_size(safe)} marked safe  "
-                f"·  {res.seconds:.0f}s.")
+        text = (f"Found {engine.fmt_size(total)} in {len(res.items)} items ({engine.fmt_size(safe)} marked safe) "
+                f"in {res.seconds:.0f}s.")
         if blocked:
             text += f"  {blocked} blocked: close the named apps or restart as administrator, then scan again."
         self.summary.setText(text)
         self.win.log(text)
         self.refresh_selection()
-        self.win.flash(f"Scan complete · {engine.fmt_size(total)} found", theme.CYAN)
+        self.win.flash(f"Scan complete: {engine.fmt_size(total)} found", theme.ACCENT)
 
     def fill(self, items):
         t = self.tree
@@ -401,7 +402,7 @@ class CleanupPage(ResultsPage):
                                   item.rule["note"] or item.where])
             leaf.setData(0, Qt.UserRole, item)
             leaf.setTextAlignment(1, Qt.AlignRight | Qt.AlignVCenter)
-            leaf.setForeground(3, QColor(theme.GREEN if safe else theme.AMBER))
+            leaf.setForeground(3, QColor(theme.MINT if safe else theme.AMBER))
             tip = "\n".join(item.paths[:40]) + (f"\n… and {len(item.paths) - 40:,} more" if len(item.paths) > 40 else "")
             leaf.setToolTip(0, tip)
             leaf.setToolTip(4, f"{item.rule['note']}\n\n{tip}".strip())
@@ -422,7 +423,7 @@ class CleanupPage(ResultsPage):
             size = sum(k.data(0, Qt.UserRole).size for k in kids)
             cat.setText(1, engine.fmt_size(size))
             cat.setTextAlignment(1, Qt.AlignRight | Qt.AlignVCenter)
-            cat.setForeground(1, QColor(theme.CYAN))
+            cat.setForeground(1, QColor(theme.ACCENT))
             cat.setExpanded(True)
         if not items:
             QTreeWidgetItem(t, ["Nothing to clean was found on this drive."])
@@ -517,10 +518,10 @@ class FilesPage(ResultsPage):
         self.sort_col, self.sort_desc = 1, True
         t.header().setSortIndicator(1, Qt.DescendingOrder)
         total = sum(i.size for i in res.items)
-        self.summary.setText(f"{len(res.items):,} files totalling {engine.fmt_size(total)}  ·  {res.seconds:.0f}s.  "
+        self.summary.setText(f"{len(res.items):,} files totalling {engine.fmt_size(total)}, found in {res.seconds:.0f}s. "
                              "Right-click to open a file or its folder. Click a column to sort.")
         self.refresh_selection()
-        self.win.flash(f"Found {len(res.items):,} large files · {engine.fmt_size(total)}", theme.CYAN)
+        self.win.flash(f"Found {len(res.items):,} large files totalling {engine.fmt_size(total)}", theme.ACCENT)
 
 
 class DuplicatesPage(ResultsPage):
@@ -592,12 +593,12 @@ class DuplicatesPage(ResultsPage):
         for members in groups.values():
             size, copies = members[0].size, len(members[0].peers)
             waste += size * (copies - 1)
-            head = QTreeWidgetItem(t, [f"{copies} copies  ·  {os.path.basename(members[0].paths[0])}", engine.fmt_size(size),
+            head = QTreeWidgetItem(t, [f"{os.path.basename(members[0].paths[0])}   ({copies} copies)", engine.fmt_size(size),
                                 "", f"{engine.fmt_size(size * (copies - 1))} reclaimable"])
             f = head.font(0)
             f.setBold(True)
             head.setFont(0, f)
-            head.setForeground(3, QColor(theme.VIOLET))
+            head.setForeground(3, QColor(theme.SKY))
             for item in members:
                 p = item.paths[0]
                 leaf = QTreeWidgetItem(head, [os.path.basename(p), engine.fmt_size(size),
@@ -609,10 +610,10 @@ class DuplicatesPage(ResultsPage):
                 leaf.setCheckState(0, Qt.Unchecked)
             head.setExpanded(len(groups) <= 200)
         t.blockSignals(False)
-        self.summary.setText(f"{len(groups):,} duplicate sets  ·  {engine.fmt_size(waste)} reclaimable  ·  "
-                             f"{res.seconds:.0f}s.  Nothing is selected until you choose.")
+        self.summary.setText(f"{len(groups):,} duplicate sets, {engine.fmt_size(waste)} reclaimable, found in "
+                             f"{res.seconds:.0f}s. Nothing is selected until you choose.")
         self.refresh_selection()
-        self.win.flash(f"{len(groups):,} duplicate sets · {engine.fmt_size(waste)} reclaimable", theme.VIOLET)
+        self.win.flash(f"{len(groups):,} duplicate sets, {engine.fmt_size(waste)} reclaimable", theme.SKY)
 
 
 class DashboardPage(Page):
@@ -638,9 +639,9 @@ class DashboardPage(Page):
         self.body.addWidget(label("Live activity", h2=True))
         row = QHBoxLayout()
         row.setSpacing(14)
-        self.cpu = MetricCard("Processor", theme.CYAN, 100)
-        self.ram = MetricCard("Memory", theme.VIOLET, 100)
-        self.disk = MetricCard("Disk activity", theme.PINK)
+        self.cpu = MetricCard("Processor", theme.ACCENT, 100)
+        self.ram = MetricCard("Memory", theme.SKY, 100)
+        self.disk = MetricCard("Disk activity", theme.MINT)
         for m in (self.cpu, self.ram, self.disk):
             row.addWidget(m)
         self.body.addLayout(row)
@@ -679,7 +680,7 @@ class DashboardPage(Page):
                               f"{engine.fmt_size(s['ram_used'])} of {engine.fmt_size(s['ram_total'])}")
         io = s["disk_read"] + s["disk_write"]
         self.disk.update_value(io, f"{engine.fmt_size(int(io))}/s",
-                               f"read {engine.fmt_size(int(s['disk_read']))}/s  ·  "
+                               f"read {engine.fmt_size(int(s['disk_read']))}/s, "
                                f"write {engine.fmt_size(int(s['disk_write']))}/s")
 
     def show_recs(self, recs):
@@ -748,18 +749,18 @@ class GuidePage(Page):
         head = QHBoxLayout()
         head.addWidget(label(g["title"], size=14, bold=True), 1)
         if g["impact"] != "-":
-            head.addWidget(pill(g["impact"], theme.CYAN))
+            head.addWidget(pill(g["impact"], theme.ACCENT))
         head.addWidget(pill(g["risk"].capitalize(), theme.RISK[g["risk"]]))
         lay.addLayout(head)
         lay.addWidget(label(g["cat"], muted=True))
         lay.addWidget(label(g["summary"], wrap=True))
         if g["steps"]:
-            steps = label("".join(f"<p style='margin:3px 0'><span style='color:{theme.CYAN}'><b>{n}.</b></span> "
+            steps = label("".join(f"<p style='margin:3px 0'><span style='color:{theme.ACCENT}'><b>{n}.</b></span> "
                                   f"{s}</p>" for n, s in enumerate(g["steps"], 1)), wrap=True)
             steps.setTextFormat(Qt.RichText)
             steps.setVisible(False)
             toggle = QPushButton("▸ Show steps")
-            toggle.setStyleSheet(f"border:none; background:transparent; color:{theme.CYAN}; text-align:left; padding:0")
+            toggle.setProperty("link", True)
             toggle.setCursor(Qt.PointingHandCursor)
             toggle.clicked.connect(lambda _=False, s=steps, t=toggle: (
                 s.setVisible(not s.isVisible()), t.setText("▾ Hide steps" if s.isVisible() else "▸ Show steps")))
@@ -831,8 +832,8 @@ class LogPage(Page):
         body = line[10:]
         color = (theme.RED if body.startswith(("ERROR", "REFUSED", "UNHANDLED")) or "could not" in body else
                  theme.AMBER if body.startswith(("SKIPPED", "KEPT", "Stopped")) else
-                 theme.GREEN if body.startswith(("CLEANED", "RECYCLED", "RESULT")) else
-                 theme.CYAN if body.startswith("> ") else None)
+                 theme.MINT if body.startswith(("CLEANED", "RECYCLED", "RESULT")) else
+                 theme.ACCENT if body.startswith("> ") else None)
         if color:
             esc = line.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br>")
             self.view.appendHtml(f"<span style='color:{color}'>{esc}</span>")
@@ -865,7 +866,7 @@ class Main(QMainWindow):
         self.session_freed = 0
         self.monitor = monitor.Monitor()
 
-        self.setWindowTitle(f"{APP}  ·  Administrator" if self.admin else APP)
+        self.setWindowTitle(f"{APP} (Administrator)" if self.admin else APP)
         self.setWindowIcon(QIcon(ICON))
         self.resize(1360, 880)
         self.setMinimumSize(1080, 700)
@@ -902,7 +903,7 @@ class Main(QMainWindow):
 
         self.refresh_drives()
         self.show_page(self.settings.value("window/page", "dashboard"))
-        self.log(f"{APP} {VERSION} started · administrator: {self.admin} · log: {logger.path}")
+        self.log(f"{APP} {VERSION} started, administrator: {self.admin}, log: {logger.path}")
 
         QTimer(self, interval=100, timeout=self.tick_task).start()
         QTimer(self, interval=1000, timeout=self.tick_metrics).start()
@@ -949,7 +950,7 @@ class Main(QMainWindow):
 
         box, blay = card(QVBoxLayout, 12, 6)
         head = QHBoxLayout()
-        head.addWidget(icon_label(GLYPH["shield"], theme.GREEN if self.admin else theme.AMBER, 18))
+        head.addWidget(icon_label(GLYPH["shield"], theme.MINT if self.admin else theme.AMBER, 18))
         head.addWidget(label("Administrator" if self.admin else "Standard mode", bold=True))
         head.addStretch(1)
         blay.addLayout(head)
@@ -962,7 +963,7 @@ class Main(QMainWindow):
             blay.addWidget(b)
         lay.addWidget(box)
         lay.addSpacing(6)
-        self.freed_label = label("", color=theme.GREEN, bold=True)
+        self.freed_label = label("", color=theme.MINT, bold=True)
         lay.addWidget(self.freed_label)
         lay.addWidget(label(f"v{VERSION}", muted=True))
         return side
@@ -979,14 +980,17 @@ class Main(QMainWindow):
         col.addWidget(self.page_sub)
         lay.addLayout(col)
         lay.addStretch(1)
-        self.chips = {}
-        for key, color in (("cpu", theme.CYAN), ("ram", theme.VIOLET), ("disk", theme.PINK)):
-            chip = QLabel()
-            chip.setTextFormat(Qt.RichText)
-            chip.setStyleSheet(f"background:{theme.SURFACE}; border:1px solid {theme.BORDER}; border-radius:12px;"
-                               "padding:5px 11px; font-size:12px;")
-            self.chips[key] = (chip, color)
-            lay.addWidget(chip)
+        self.readings = {}
+        for key, name, color in (("cpu", "CPU", theme.ACCENT), ("ram", "Memory", theme.SKY),
+                                 ("disk", "Disk", theme.MINT)):
+            col = QVBoxLayout()
+            col.setSpacing(0)
+            value = number("-", 22, color)
+            col.addWidget(value, 0, Qt.AlignRight)
+            col.addWidget(label(name, muted=True), 0, Qt.AlignRight)
+            self.readings[key] = value
+            lay.addLayout(col)
+            lay.addSpacing(18)
         lay.addSpacing(14)
         lay.addWidget(label("Drive", muted=True))
         self.drive_box = QComboBox()
@@ -1001,8 +1005,7 @@ class Main(QMainWindow):
         v = QVBoxLayout(bar)
         v.setContentsMargins(20, 8, 16, 10)
         v.setSpacing(6)
-        self.progress_bar = QProgressBar(textVisible=False)
-        self.progress_bar.setMaximumHeight(5)
+        self.progress_bar = HazardBar(6)
         v.addWidget(self.progress_bar)
         row = QHBoxLayout()
         self.dot = PulseDot()
@@ -1083,7 +1086,7 @@ class Main(QMainWindow):
         self.log(f"RESULT {title} finished with exit code {code}")
         self.refresh_drives()
         self.flash(f"{title} finished" if code == 0 else f"{title} exited with code {code} (see Activity)",
-                   theme.GREEN if code == 0 else theme.AMBER)
+                   theme.MINT if code == 0 else theme.AMBER)
 
     # ------------------------------------------------------------------ drives + live data
     def refresh_drives(self):
@@ -1122,10 +1125,9 @@ class Main(QMainWindow):
         s = self.monitor.sample()
         self.pages["dashboard"].update_metrics(s)
         io = s["disk_read"] + s["disk_write"]
-        for key, text in (("cpu", f"CPU <b>{s['cpu']:.0f}%</b>"), ("ram", f"RAM <b>{s['ram']:.0f}%</b>"),
-                          ("disk", f"Disk <b>{engine.fmt_size(int(io))}/s</b>")):
-            chip, color = self.chips[key]
-            chip.setText(f"<span style='color:{color}'>●</span>&nbsp;{text}")
+        self.readings["cpu"].setText(f"{s['cpu']:.0f}%")
+        self.readings["ram"].setText(f"{s['ram']:.0f}%")
+        self.readings["disk"].setText(f"{engine.fmt_size(int(io))}/s")
 
     def check_recommendations(self):
         dash = self.pages["dashboard"]
@@ -1156,7 +1158,7 @@ class Main(QMainWindow):
         self.progress_text, self.progress_frac = phase, None
         self.stoppable = stoppable
         self.flash_timer.stop()
-        self.dot.set_active(True, theme.CYAN)
+        self.dot.set_active(True, theme.ACCENT)
         self.phase.setStyleSheet("font-size:13px; font-weight:700")
         self.phase.setText(phase)
         self.stop_btn.setEnabled(stoppable)
@@ -1210,52 +1212,46 @@ class Main(QMainWindow):
         elapsed = max(time.monotonic() - s.started, 0.001)
         parts = []
         if s.files or s.dirs:
-            parts += [f"<span style='color:{c.CYAN}'><b>{s.files:,}</b></span> files",
-                      f"<span style='color:{c.BLUE}'><b>{s.dirs:,}</b></span> folders",
+            parts += [f"<span style='color:{c.ACCENT}'><b>{s.files:,}</b></span> files",
+                      f"<span style='color:{c.SKY}'><b>{s.dirs:,}</b></span> folders",
                       f"<span style='color:{c.MUTED}'>{s.files / elapsed:,.0f}/s</span>"]
         if s.found:
-            parts.append(f"found <span style='color:{c.VIOLET}'><b>{engine.fmt_size(s.found)}</b></span>")
+            parts.append(f"found <span style='color:{c.SKY}'><b>{engine.fmt_size(s.found)}</b></span>")
         if s.deleted:
-            parts.append(f"removed <span style='color:{c.GREEN}'><b>{s.deleted:,}</b></span>")
+            parts.append(f"removed <span style='color:{c.MINT}'><b>{s.deleted:,}</b></span>")
         if s.freed:
-            parts.append(f"freed <span style='color:{c.GREEN}'><b>{engine.fmt_size(s.freed)}</b></span>")
+            parts.append(f"freed <span style='color:{c.MINT}'><b>{engine.fmt_size(s.freed)}</b></span>")
         if s.moved:
-            parts.append(f"recycled <span style='color:{c.GREEN}'><b>{engine.fmt_size(s.moved)}</b></span>")
+            parts.append(f"recycled <span style='color:{c.MINT}'><b>{engine.fmt_size(s.moved)}</b></span>")
         if s.errors:
             parts.append(f"<span style='color:{c.AMBER}'>{s.errors:,} skipped</span>")
         parts.append(f"<span style='color:{c.MUTED}'>{int(elapsed // 60):02d}:{int(elapsed % 60):02d}</span>")
-        self.counters.setText("&nbsp;&nbsp;·&nbsp;&nbsp;".join(parts))
+        self.counters.setText("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".join(parts))
         if not self.cancel.is_set():
             self.phase.setText(self.progress_text or s.phase)
         cur = s.current
         self.current.setText(cur if len(cur) < 72 else cur[:24] + " … " + cur[-44:])
-        if self.progress_frac is None:
-            self.progress_bar.setRange(0, 0)
-        else:
-            self.progress_bar.setRange(0, 1000)
-            self.progress_bar.setValue(int(self.progress_frac * 1000))
+        self.progress_bar.set_busy(self.progress_frac)
 
     def flash(self, msg, color):
         if self.busy():
             return self.log(msg)
-        self.dot.set_active(True, color)
+        self.dot.set_active(True, color, blink=False)
         self.phase.setText(msg)
         self.phase.setStyleSheet(f"color:{color}; font-size:13px; font-weight:700")
         self.counters.setText("")
         self.current.setText("")
-        self.progress_bar.setRange(0, 1000)
-        self.progress_bar.setValue(1000 if color in (theme.GREEN, theme.CYAN, theme.VIOLET) else 0)
+        self.progress_bar.set_done(color) if color != theme.RED else self.progress_bar.set_idle()
         self.flash_timer.start()
 
     def idle_taskbar(self):
         self.dot.set_active(False)
         self.phase.setText("Ready")
         self.phase.setStyleSheet("font-size:13px; font-weight:700")
-        self.counters.setText(f"<span style='color:{theme.MUTED}'>Scans are read-only  ·  Esc stops  ·  "
-                              "Ctrl+1-6 pages  ·  F5 scans</span>")
+        self.counters.setText(f"<span style='color:{theme.MUTED}'>Scans only read. Esc stops a task, "
+                              "Ctrl+1 to 6 switch pages, F5 scans.</span>")
         self.current.setText("")
-        self.progress_bar.setRange(0, 1000)
-        self.progress_bar.setValue(0)
+        self.progress_bar.set_idle()
 
     # ------------------------------------------------------------------ misc
     def log(self, msg):

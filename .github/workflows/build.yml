@@ -26,15 +26,33 @@ jobs:
         run: build.bat
 
       - name: Upload exe
+        id: upload
         uses: actions/upload-artifact@v6
         with:
           name: Custodian
           path: dist/Custodian.exe
           if-no-files-found: error
 
+      # Code signing through SignPath Foundation. Skipped until the repository variable
+      # SIGNPATH_ORGANIZATION_ID and the secret SIGNPATH_API_TOKEN exist (see README > Code signing).
+      - name: Sign with SignPath
+        if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'Custodian' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/Custodian.exe --title "Custodian $GITHUB_REF_NAME" --generate-notes
+        run: |
+          exe=dist/Custodian.exe
+          if [ -f signed/Custodian.exe ]; then exe=signed/Custodian.exe; fi
+          gh release create "$GITHUB_REF_NAME" "$exe" --title "Custodian $GITHUB_REF_NAME" --generate-notes

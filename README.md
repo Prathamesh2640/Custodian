@@ -48,14 +48,15 @@ personal folders.
 
 ## Download and run
 
-Download `Custodian.exe` from the latest build (Actions → *build* → artifacts) and run it.
-It needs no installation and no Python.
+Download `Custodian.exe` from the [latest release](https://github.com/Prathamesh2640/Custodian/releases/latest)
+and run it. It needs no installation and no Python.
 
 It starts without admin rights, so there is no UAC prompt. Click **Restart as administrator** in the sidebar
 to clean Windows folders and other accounts, and to run system procedures.
 
-> Unsigned executables downloaded from the internet can show a SmartScreen notice the first time.
-> Builds made on your own PC do not. See *Code signing* below for how to remove the notice when you distribute the exe.
+> **"Windows protected your PC"?** Releases are not code-signed yet (see *Code signing policy*), so Windows
+> SmartScreen asks once for any downloaded copy. Click **More info → Run anyway**, or right-click the file →
+> **Properties** → tick **Unblock**. Building from source avoids the prompt entirely.
 
 ## Build from source
 
@@ -85,9 +86,9 @@ src/
   rules.py       what gets cleaned: paths, risk, locking apps, minimum age
   knowledge.py   procedures guide and machine recommendations
   monitor.py     live CPU / memory / disk readings (Windows APIs)
-  theme.py       colours and style sheet
-  widgets.py     gauges, sparklines, drive cards, confirm dialog
-  make_icon.py   regenerates icon.ico
+  theme.py       palette, type and style sheet
+  widgets.py     storage bars, hazard-tape progress, sparklines, drive cards, dialogs
+  make_icon.py   regenerates icon.ico (platter key logo)
 tests/
   test_engine.py guard-rail and deletion checks
 packaging/
@@ -96,10 +97,33 @@ packaging/
 
 To add a cleanup target, add a rule in `src/rules.py`. Every path a rule produces still has to pass the guard rails.
 
-### Code signing
+## Code signing policy
 
-To distribute the exe without SmartScreen or antivirus reputation warnings, sign it with a code-signing certificate:
+Custodian will use free open-source code signing from [SignPath Foundation](https://signpath.org).
+Until the project is approved, release binaries are unsigned.
 
-```bat
-signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a dist\Custodian.exe
-```
+Once approved:
+- Only builds made by this repository's GitHub Actions workflow, from a `v*` tag, are submitted for signing.
+  Nothing built on a personal machine is signed.
+- Each signing request needs manual approval by a maintainer.
+- Every release lists its commit, and the workflow file shows exactly how the exe was built.
+
+| Role | Members |
+|---|---|
+| Committers and reviewers | [Prathamesh2640](https://github.com/Prathamesh2640) |
+| Approvers | [Prathamesh2640](https://github.com/Prathamesh2640) |
+
+**Privacy:** Custodian does not send any data anywhere. It has no telemetry, update checks or network access.
+Logs stay on your PC in `%LOCALAPPDATA%\Custodian\logs`.
+
+**Enabling signing in CI:** once SignPath approves the project, set these on the GitHub repository:
+- the secret `SIGNPATH_API_TOKEN`;
+- the variable `SIGNPATH_ORGANIZATION_ID`;
+- the variables `SIGNPATH_PROJECT_SLUG` and `SIGNPATH_POLICY_SLUG`, if they are not `Custodian` and `release-signing`.
+
+The next tagged release is then signed automatically.
+In the SignPath project, set the artifact configuration to a ZIP file containing `Custodian.exe`.
+
+## License
+
+[MIT](LICENSE)
