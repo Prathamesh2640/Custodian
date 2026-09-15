@@ -1,4 +1,7 @@
 """Colors, fonts and the application style sheet."""
+import os
+import sys
+
 from PySide6.QtGui import QColor, QFont, QPalette
 
 BG = "#0a0e1a"
@@ -50,8 +53,23 @@ def apply(app):
     pal.setColor(QPalette.Disabled, QPalette.ButtonText, QColor("#4b5675"))
     pal.setColor(QPalette.Disabled, QPalette.WindowText, QColor("#4b5675"))
     app.setPalette(pal)
-    app.setStyleSheet(QSS)
+    here = os.path.dirname(os.path.abspath(__file__))
+    base = getattr(sys, "_MEIPASS", here).replace("\\", "/")
+    app.setStyleSheet(QSS + INDICATORS.replace("{base}", base))
 
+
+# Fusion's default check boxes are nearly invisible on a dark background.
+INDICATORS = f"""
+QCheckBox::indicator, QTreeWidget::indicator {{
+    width: 15px; height: 15px; border-radius: 4px; border: 1px solid #5d6f9c; background: #0b1224;
+}}
+QCheckBox::indicator:hover, QTreeWidget::indicator:hover {{ border-color: {CYAN}; }}
+QCheckBox::indicator:checked, QTreeWidget::indicator:checked {{
+    background: {CYAN}; border-color: {CYAN}; image: url({{base}}/check.svg);
+}}
+QTreeWidget::indicator:indeterminate {{ background: {VIOLET}; border-color: {VIOLET}; image: url({{base}}/partial.svg); }}
+QCheckBox::indicator:disabled, QTreeWidget::indicator:disabled {{ border-color: #2a3656; background: #111a2e; }}
+"""
 
 QSS = f"""
 QMainWindow, QDialog {{ background: {BG}; }}

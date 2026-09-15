@@ -335,6 +335,18 @@ class CleanupPage(ResultsPage):
         self.deep.setEnabled(not busy)
         self.users.setEnabled(not busy and self.win.admin)
 
+    def refresh_selection(self, *_):
+        # ticking a category also ticks its blocked rows; untick them so the view never lies
+        blocked = [n for n in self.nodes() if n.data(0, Qt.UserRole) is not None
+                   and n.data(0, Qt.UserRole).blocked and n.checkState(0) != Qt.Unchecked]
+        if blocked:
+            self.tree.blockSignals(True)
+            for n in blocked:
+                n.setCheckState(0, Qt.Unchecked)
+            self.tree.blockSignals(False)
+            self.tree.viewport().update()
+        super().refresh_selection()
+
     def toggle_expand(self):
         expand = not any(self.tree.topLevelItem(i).isExpanded() for i in range(self.tree.topLevelItemCount()))
         (self.tree.expandAll if expand else self.tree.collapseAll)()
@@ -394,6 +406,8 @@ class CleanupPage(ResultsPage):
             leaf.setToolTip(0, tip)
             leaf.setToolTip(4, f"{item.rule['note']}\n\n{tip}".strip())
             if item.blocked:
+                # Qt derives a category's box from its children; a child without a state hides it
+                leaf.setCheckState(0, Qt.Unchecked)
                 leaf.setFlags(leaf.flags() & ~Qt.ItemIsUserCheckable & ~Qt.ItemIsEnabled)
                 leaf.setText(4, f"Blocked: {item.blocked}")
                 leaf.setForeground(4, QColor(theme.AMBER))
@@ -704,7 +718,8 @@ class GuidePage(Page):
         chips = QHBoxLayout()
         self.cat_group = QButtonGroup(self)
         for n, cat in enumerate(["All"] + knowledge.CATEGORIES):
-            b = QPushButton(cat)
+            b = QPushButton(cat.replace("&", "&&"))
+            b.setProperty("category", cat)
             b.setCheckable(True)
             b.setProperty("chip", True)
             b.setCursor(Qt.PointingHandCursor)
@@ -779,7 +794,7 @@ class GuidePage(Page):
 
     def filter(self):
         text = self.search.text().strip().lower()
-        cat = self.cat_group.checkedButton().text()
+        cat = self.cat_group.checkedButton().property("category")
         for _, frame in self.cards:
             self.grid.removeWidget(frame)
             frame.hide()

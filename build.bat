@@ -15,6 +15,7 @@ rem --noupx: UPX-packed executables trigger far more antivirus false positives.
 .venv\Scripts\python -m PyInstaller --noconfirm --clean --onefile --windowed --noupx ^
     --name Custodian --paths src --distpath dist --workpath build --specpath build ^
     --icon "%CD%\src\icon.ico" --add-data "%CD%\src\icon.ico;." ^
+    --add-data "%CD%\src\check.svg;." --add-data "%CD%\src\partial.svg;." ^
     --version-file "%CD%\packaging\version_info.txt" ^
     --exclude-module tkinter src\main.py || goto :fail
 
