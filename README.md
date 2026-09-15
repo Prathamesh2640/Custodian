@@ -4,7 +4,13 @@ Drive care for Windows. Custodian scans any local drive, explains what is taking
 only what you approve. It has guard rails that stop it from touching Windows, program folders or your
 personal folders.
 
-![Custodian scanning a drive](docs/screenshots/cleanup.png)
+![Dashboard with live drive gauges, activity charts and recommendations](docs/screenshots/dashboard.png)
+
+| Cleanup results | Live scan progress |
+|---|---|
+| ![Cleanup results grouped by category](docs/screenshots/cleanup.png) | ![Scan in progress with live counters](docs/screenshots/scanning.png) |
+
+![Toolbox and guide](docs/screenshots/guide.png)
 
 ## Features
 
