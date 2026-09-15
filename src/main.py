@@ -23,7 +23,7 @@ from widgets import (ConfirmDialog, DriveCard, HazardBar, MetricCard, PulseDot, 
                      pill)
 
 APP = "Custodian"
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 ICON = os.path.join(BASE, "icon.ico")
 DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), APP)

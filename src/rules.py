@@ -65,7 +65,8 @@ SYSTEM_RULES = [
       [r"%LOCALAPPDATA%\D3DSCache", r"%LOCALAPPDATA%\NVIDIA\DXCache", r"%LOCALAPPDATA%\NVIDIA\GLCache",
        r"%LOCALAPPDATA%\AMD\DxCache", r"%LOCALAPPDATA%\AMD\DxcCache"]),
     R("hprof", "Temp & crash dumps", "Java heap dumps in your home folder",
-      [r"%USERPROFILE%\*.hprof"], action="files"),
+      [r"%USERPROFILE%\*.hprof"], action="files", risk=REVIEW,
+      note="Only needed if you are investigating a Java/Android Studio crash."),
 
     # --- Browsers --------------------------------------------------------
     R("chrome", "Browsers", "Chrome caches (logins, history, bookmarks untouched)",
@@ -182,7 +183,8 @@ SYSTEM_RULES = [
 DEEP_RULES = [
     R("pycache", "Found on drive", "__pycache__ folders", ["__pycache__"], action="tree",
       note="Python recreates these automatically."),
-    R("dumps", "Found on drive", "Crash / heap dump files (*.dmp, *.hprof)", ["*.dmp", "*.hprof"], action="files"),
+    R("dumps", "Found on drive", "Crash / heap dump files (*.dmp, *.hprof)", ["*.dmp", "*.hprof"], action="files",
+      risk=REVIEW, note="Crash dumps are only needed while diagnosing a crash. Check none are kept on purpose."),
     R("thumbs", "Found on drive", "Thumbs.db / .DS_Store", ["Thumbs.db", ".DS_Store"], action="files"),
     R("node_modules", "Found on drive", "node_modules folders (restored by npm install)", ["node_modules"],
       action="tree", risk=REVIEW,

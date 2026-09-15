@@ -502,7 +502,8 @@ class ScanResult:
 
 
 RECYCLE_RULE = rules.R("recycle_bin", "Recycle Bin", "Recycle Bin on this drive", [], action="recyclebin",
-                       note="Emptied through Windows, same as right-click > Empty Recycle Bin.")
+                       risk=rules.REVIEW,   # it may hold something deleted by mistake: never pre-selected
+                       note="Open the Recycle Bin and restore anything you still need first. Emptying is permanent.")
 FILE_RULE = rules.R("user_file", "Files", "File", [], action="userfile", risk=rules.REVIEW)
 DUP_RULE = rules.R("duplicate", "Duplicates", "Duplicate copy", [], action="userfile", risk=rules.REVIEW)
 NODE_RULE = next(r for r in rules.DEEP_RULES if r["id"] == "node_modules")

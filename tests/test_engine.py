@@ -153,6 +153,42 @@ def main():
         assert out["skipped"] == 1 and os.path.exists(big), out
         assert engine.scan_files(tmp, g, threading.Event(), min_mb=1, older_days=30).items == []
 
+    # --- rule table audit: no rule can reach personal files or folders
+    personal = ("desktop", "documents", "downloads", "pictures", "videos", "music", "onedrive", "favorites",
+                "contacts", "saved games")
+    allowed_roots = ("%LOCALAPPDATA%\\", "%APPDATA%\\", "%TEMP%", "%SYSTEMROOT%\\", "%PROGRAMDATA%\\",
+                     "%SYSTEMDRIVE%\\NVIDIA\\*", "%SYSTEMDRIVE%\\AMD\\*", "%USERPROFILE%\\.",
+                     "%USERPROFILE%\\GO\\PKG\\", "%USERPROFILE%\\ANACONDA3\\PKGS", "%USERPROFILE%\\MINICONDA3\\PKGS",
+                     "%USERPROFILE%\\*.HPROF")
+    for rule in engine.rules.SYSTEM_RULES:
+        assert rule["risk"] in ("safe", "review") and rule["action"] in ("contents", "tree", "files"), rule["id"]
+        for t in rule["paths"]:
+            up = t.upper()
+            assert up.startswith(allowed_roots), f"{rule['id']}: unexpected root {t}"
+            assert not any(f"\\{p.upper()}" in up for p in personal), f"{rule['id']}: touches personal folder {t}"
+        for prof in engine.user_profiles(False):
+            for t in rule["paths"]:
+                for p in engine.expand(t, prof):
+                    assert g.check(p, is_file=rule["action"] == "files") is None or rule["admin"], (rule["id"], p)
+                    parts = {s.lower() for s in engine.norm(p).split("\\")}
+                    assert not parts & set(personal), (rule["id"], p)
+
+    deep_dirs = {n.lower() for r in engine.rules.DEEP_RULES if r["action"] == "tree" for n in r["paths"]}
+    deep_files = [n.lower() for r in engine.rules.DEEP_RULES if r["action"] == "files" for n in r["paths"]]
+    for name in (".git", ".svn", "src", "build", "dist", "bin", "obj", "target", "venv", ".venv", "documents",
+                 "photos", "backup", "projects", ".vscode", ".idea", "data", "models", ".ssh", ".gnupg"):
+        assert name not in deep_dirs, f"deep scan would delete folders named {name}"
+    import fnmatch
+    for name in ("report.docx", "budget.xlsx", "slides.pptx", "thesis.pdf", "photo.jpg", "clip.mp4", "notes.txt",
+                 "id_rsa", "wallet.dat", "app.db", "save.sav", "backup.zip", "project.psd", "passwords.kdbx",
+                 "main.py", "package.json", "readme.md", "desktop.ini", "~notes.txt", "$data.bin"):
+        assert not any(fnmatch.fnmatchcase(name, p) for p in deep_files), f"deep scan would delete {name}"
+    for rule in engine.rules.DEEP_RULES:
+        if rule["id"] in ("dumps", "old_tmp", "mac_meta", "mac_forks", "node_modules"):
+            assert rule["risk"] == "review", f"{rule['id']} must never be pre-selected"
+    for rule in (engine.RECYCLE_RULE, engine.FILE_RULE, engine.DUP_RULE):
+        assert rule["risk"] == "review", f"{rule['id']} must never be pre-selected"
+
     assert engine.list_drives(), "no drives listed"
     print("all engine checks passed")
 

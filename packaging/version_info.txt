@@ -2,8 +2,8 @@
 # Keep filevers/prodvers in sync with VERSION in src/main.py.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 1, 0, 0),
-    prodvers=(1, 1, 0, 0),
+    filevers=(1, 1, 1, 0),
+    prodvers=(1, 1, 1, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
       StringTable('040904B0', [
         StringStruct('CompanyName', 'Prathamesh Sharma'),
         StringStruct('FileDescription', 'Custodian - drive cleaner for Windows'),
-        StringStruct('FileVersion', '1.1.0'),
+        StringStruct('FileVersion', '1.1.1'),
         StringStruct('InternalName', 'Custodian'),
         StringStruct('LegalCopyright', 'Copyright (c) 2026 Prathamesh Sharma'),
         StringStruct('OriginalFilename', 'Custodian.exe'),
         StringStruct('ProductName', 'Custodian'),
-        StringStruct('ProductVersion', '1.1.0')
+        StringStruct('ProductVersion', '1.1.1')
       ])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
